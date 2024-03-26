@@ -21,7 +21,6 @@ class _FileUploadScreenState extends State<FileUploadScreen> {
 
   CollectionReference _firestore = FirebaseFirestore.instance.collection('files');
 
-  File? _selectedFile;
   double _uploadProgress = 0.0;
   bool _uploading = false;
   String _uploadStatus = '';
@@ -30,11 +29,12 @@ class _FileUploadScreenState extends State<FileUploadScreen> {
   String filename = '';
   String? uploadedimageurl;
   UploadTask? uploadTask;
+  FilePickerResult? result;
 
   Future<void> _selectFile() async {
     _message = null;
     _uploading = false;
-    FilePickerResult? result = await FilePicker.platform.pickFiles(
+    result = await FilePicker.platform.pickFiles(
       type: FileType.custom,
       allowMultiple: false,
       allowedExtensions: ['jpg', 'jpeg', 'png', 'mp4'],
@@ -42,26 +42,18 @@ class _FileUploadScreenState extends State<FileUploadScreen> {
     final path = result?.files.single.path;
     filename = p.basenameWithoutExtension(path!);
     type = p.extension(path);
-    if (result != null) {
-      _selectedFile = File(path);
-      if (!_selectedFile!.existsSync()) {
-        _selectedFile!.create(recursive: true);
-      }
-      await _selectedFile!.writeAsBytes(await File(path).readAsBytes());
-      if ((_selectedFile!.lengthSync()) > 10 * 1024 * 1024) {
+    if ((File(path).lengthSync()) > 10 * 1024 * 1024) {
         setState(() {
           _message = 'File size exceeds 10MB limit.';
         });
         return;
       }
       setState(() {
-
       });
     }
-  }
 
   Future<String> saveData(
-      {required String name, required String type, required File file}) async {
+      {required String name, required String type, required String file}) async {
     String resp = "Some error occurred";
     try {
       uploadedimageurl = await uploadImageToStorage(name, file);
@@ -78,12 +70,12 @@ class _FileUploadScreenState extends State<FileUploadScreen> {
     return resp;
   }
 
-  Future<String> uploadImageToStorage(String filename, File file) async {
+  Future<String> uploadImageToStorage(String filename, String file) async {
     final _storage = FirebaseStorage.instance.ref();
     final refDir = _storage.child('files');
     try {
       final reffile = refDir.child('filename');
-      uploadTask = reffile.putFile(file);
+      uploadTask = reffile.putFile(File(file));
       setState(() {
         _uploading = true;
       });
@@ -103,11 +95,11 @@ class _FileUploadScreenState extends State<FileUploadScreen> {
   }
 
   Future<void> _uploadFile() async {
-    if (!_selectedFile!.existsSync()) {
+    if (result?.files.single.path != '') {
       _message = 'Please select the file first';
       return;
     }
-    _message = await saveData(file: _selectedFile!, name: filename, type: type);
+    _message = await saveData(file: (result?.files.single.path)!, name: filename, type: type);
 
     setState(() {
       _uploading = false;
@@ -130,9 +122,9 @@ class _FileUploadScreenState extends State<FileUploadScreen> {
               child: Text('Select File'),
             ),
             SizedBox(height: 10),
-            if (_selectedFile != null) Text('file picked is $filename'),
+            if (((result?.files.single.path)) != null) Text('file picked is $filename'),
             SizedBox(height: 20),
-            if (_selectedFile != null && !_uploading && _message != 'File size exceeds 10MB limit.')
+            if (((result?.files.single.path)) != null && !_uploading && _message != 'File size exceeds 10MB limit.')
               ElevatedButton(
                 onPressed: _uploadFile,
                 child: Text('Upload File'),
@@ -156,8 +148,8 @@ class _FileUploadScreenState extends State<FileUploadScreen> {
   }
 
   Widget _buildPreviewWidget(String? uploadedimageurl) {
-    if (_selectedFile!.path.toLowerCase().endsWith('.mp4')) {
-      final controller = VideoPlayerController.file(_selectedFile!);
+    if ((result?.files.single.path)!.toLowerCase().endsWith('.mp4')) {
+      final controller = VideoPlayerController.file(File(uploadedimageurl!));
       return AspectRatio(
         aspectRatio: 16 / 9,
         child: controller.value.isInitialized
