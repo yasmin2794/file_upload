@@ -1,8 +1,8 @@
-import 'dart:developer';
 import 'dart:io';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_storage/firebase_storage.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:video_player/video_player.dart';
@@ -30,20 +30,38 @@ class _FileUploadScreenState extends State<FileUploadScreen> {
   String filename = '';
   String? uploadedimageurl;
   UploadTask? uploadTask;
-  FilePickerResult? result;
+  String? path;
+  late Uint8List file;
 
   Future<void> _selectFile() async {
+    FilePickerResult? result;
     _message = null;
     _uploading = false;
-    result = await FilePicker.platform.pickFiles(
-      type: FileType.custom,
-      allowMultiple: false,
-      allowedExtensions: ['jpg', 'jpeg', 'png', 'mp4'],
-    );
-    final path = result?.files.single.path;
+      result = await FilePicker.platform.pickFiles(
+        type: FileType.custom,
+        allowMultiple: false,
+        allowedExtensions: ['jpg', 'jpeg', 'png', 'mp4'],
+        withData: true
+      );
+    if(result != null && result.files.isNotEmpty) {
+      path = result.files.single.path;
+      if (result.files.single.bytes != null) {
+        file = result.files.single.bytes!;
+      } else{
+        print('resultant file is null');
+      }
+    }
+    if(File(path!).existsSync())
+      print('file exist');
+    else
+      {
+        File(path!).create();
+        File(path!).writeAsStringSync(path!);
+        print('file created');
+      }
     filename = p.basenameWithoutExtension(path!);
-    type = p.extension(path);
-    if ((File(path).lengthSync()) > 10 * 1024 * 1024) {
+    type = p.extension(path!);
+    if ((File(path!).lengthSync()) > 10 * 1024 * 1024) {
         setState(() {
           _message = 'File size exceeds 10MB limit.';
         });
@@ -53,20 +71,35 @@ class _FileUploadScreenState extends State<FileUploadScreen> {
       });
     }
 
+  _uploadFile() async {
+    if ((path)!.isEmpty) {
+      _message = 'Please select the file first';
+      setState(() {});
+      return;
+    }
+    setState(() {
+      _uploading = true;
+    });
+
+    if(mAuth.currentUser == null)
+      mAuth.signInAnonymously();
+    _message = await saveData(file: file, name: filename, type: type);
+    setState(() {
+      _uploading = false;
+    });
+  }
+
   Future<String> saveData(
-      {required String name, required String type, required String file}) async {
+      {required String name, required String type, required Uint8List file}) async {
     String resp = "Some error occurred";
-    print('hi resp : $resp');
     try {
       uploadedimageurl = await uploadImageToStorage(name, file);
-      print('uploadedimgurl: $uploadedimageurl');
       await _firestore.add({
         'name': name,
         'type': type,
         'imagelink': uploadedimageurl,
       });
       resp = 'File uploaded successfully';
-      print('resp success: $resp');
     } catch (err) {
       print('err: $err');
       resp = err.toString();
@@ -74,16 +107,20 @@ class _FileUploadScreenState extends State<FileUploadScreen> {
     return resp;
   }
 
-  Future<String> uploadImageToStorage(String filename, String file) async {
-    print('hi storage');
+  Future<String> uploadImageToStorage(String filename, Uint8List file) async {
     final _storage = FirebaseStorage.instance.ref();
     final refDir = _storage.child('files');
-    print('hi refdir ${refDir.name}');
     try {
-      final reffile = refDir.child(filename);
-      print('hi reffile: ${reffile.fullPath} ${reffile.name}');
-      uploadTask = reffile.putFile(File(file));
-      print('uploadtask: ${uploadTask.toString()}');
+      final reffile = refDir.child('$filename$type');
+      final metadata = SettableMetadata(
+        contentType: (type == '.mp4') ? 'video/mp4' : 'images/${type}',
+      );
+      if(kIsWeb){
+        uploadTask= reffile.putData(await file, metadata);
+      }else {
+        uploadTask =
+            reffile.putFile(File(path!), metadata);
+      }
       TaskSnapshot snapshot =
           await uploadTask!.whenComplete(() => print('completed'));
       uploadedimageurl = await reffile.getDownloadURL();
@@ -99,30 +136,6 @@ class _FileUploadScreenState extends State<FileUploadScreen> {
     return uploadedimageurl!;
   }
 
-  _uploadFile() async {
-    print('hi');
-    if ((result?.files.single.path)!.isEmpty) {
-      _message = 'Please select the file first';
-      setState(() {
-        print('returning');
-      });
-      return;
-    }
-    setState(() {
-      _uploading = true;
-    });
-    print('_uploading : $_uploading');
-
-    if(mAuth.currentUser == null)
-      mAuth.signInAnonymously();
-    print('currentuser: ${mAuth.currentUser}');
-    _message = await saveData(file: (result?.files.single.path)!, name: filename, type: type);
-    setState(() {
-      _uploading = false;
-    });
-
-    print('Uploading false: $_uploading');
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -140,9 +153,9 @@ class _FileUploadScreenState extends State<FileUploadScreen> {
               child: Text('Select File'),
             ),
             SizedBox(height: 10),
-            if (((result?.files.single.path)) != null) Text('file picked is $filename'),
+            if (path != null) Text('file picked is $filename'),
             SizedBox(height: 20),
-            if (((result?.files.single.path)) != null && !_uploading && _message != 'File size exceeds 10MB limit.')
+            if (path != null && !_uploading && _message != 'File size exceeds 10MB limit.')
               ElevatedButton(
                 onPressed: _uploadFile,
                 child: Text('Upload File'),
@@ -164,7 +177,7 @@ class _FileUploadScreenState extends State<FileUploadScreen> {
   }
 
   Widget _buildPreviewWidget(String? uploadedimageurl) {
-    if ((result?.files.single.path)!.toLowerCase().endsWith('.mp4')) {
+    if (path!.toLowerCase().endsWith('.mp4')) {
       final controller = VideoPlayerController.file(File(uploadedimageurl!));
       return AspectRatio(
         aspectRatio: 16 / 9,
