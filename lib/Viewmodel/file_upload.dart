@@ -23,7 +23,6 @@ class _FileUploadScreenState extends State<FileUploadScreen> {
 
   double _uploadProgress = 0.0;
   bool _uploading = false;
-  String _uploadStatus = '';
   String? _message;
   String type = '';
   String filename = '';
@@ -55,14 +54,17 @@ class _FileUploadScreenState extends State<FileUploadScreen> {
   Future<String> saveData(
       {required String name, required String type, required String file}) async {
     String resp = "Some error occurred";
+    print('hi resp : $resp');
     try {
       uploadedimageurl = await uploadImageToStorage(name, file);
+      print('uploadedimgurl: $uploadedimageurl');
       await _firestore.add({
         'name': name,
         'type': type,
         'imagelink': uploadedimageurl,
       });
       resp = 'File uploaded successfully';
+      print('resp success: $resp');
     } catch (err) {
       print('err: $err');
       resp = err.toString();
@@ -71,14 +73,15 @@ class _FileUploadScreenState extends State<FileUploadScreen> {
   }
 
   Future<String> uploadImageToStorage(String filename, String file) async {
+    print('hi storage');
     final _storage = FirebaseStorage.instance.ref();
     final refDir = _storage.child('files');
+    print('hi refdir ${refDir.name}');
     try {
-      final reffile = refDir.child('filename');
+      final reffile = refDir.child(filename);
+      print('hi reffile: ${reffile.fullPath} ${reffile.name}');
       uploadTask = reffile.putFile(File(file));
-      setState(() {
-        _uploading = true;
-      });
+      print('uploadtask: ${uploadTask.toString()}');
       TaskSnapshot snapshot =
           await uploadTask!.whenComplete(() => print('completed'));
       uploadedimageurl = await snapshot.ref.getDownloadURL();
@@ -94,16 +97,26 @@ class _FileUploadScreenState extends State<FileUploadScreen> {
     return uploadedimageurl!;
   }
 
-  Future<void> _uploadFile() async {
-    if (result?.files.single.path != '') {
+  _uploadFile() async {
+    print('hi');
+    if ((result?.files.single.path)!.isEmpty) {
       _message = 'Please select the file first';
+      setState(() {
+        print('returning');
+      });
       return;
     }
+    setState(() {
+      _uploading = true;
+    });
+    print('_uploading : $_uploading');
     _message = await saveData(file: (result?.files.single.path)!, name: filename, type: type);
 
     setState(() {
       _uploading = false;
     });
+
+    print('Uploading false: $_uploading');
   }
 
   @override
@@ -137,8 +150,6 @@ class _FileUploadScreenState extends State<FileUploadScreen> {
                 _message!,
                 style: TextStyle(color: Colors.red),
               ),
-            SizedBox(height: 20),
-            Text(_uploadStatus),
             SizedBox(height: 10),
             if (uploadedimageurl != null) _buildPreviewWidget(uploadedimageurl),
           ],
