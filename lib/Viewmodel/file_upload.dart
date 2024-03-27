@@ -65,18 +65,15 @@ class _FileUploadScreenState extends State<FileUploadScreen> {
     }
 
   _uploadFile() async {
-    if ((path)!.isEmpty) {
-      _message = 'Please select the file first';
-      setState(() {});
-      return;
-    }
     setState(() {
       _uploading = true;
     });
 
     if(mAuth.currentUser == null)
       mAuth.signInAnonymously();
+
     _message = await saveData(file: file, name: filename, type: type);
+
     setState(() {
       _uploading = false;
     });
@@ -105,14 +102,11 @@ class _FileUploadScreenState extends State<FileUploadScreen> {
     final refDir = _storage.child('files');
     try {
       final reffile = refDir.child('$filename$type');
-      final metadata = SettableMetadata(
-        contentType: (type == '.mp4') ? 'video/mp4' : 'images/${type}',
-      );
       if(kIsWeb){
-        uploadTask= reffile.putData(await file, metadata);
+        uploadTask= reffile.putData(await file);
       }else {
         uploadTask =
-            reffile.putFile(File(path!), metadata);
+            reffile.putFile(File(path!));
       }
       TaskSnapshot snapshot =
           await uploadTask!.whenComplete(() => print('completed'));
