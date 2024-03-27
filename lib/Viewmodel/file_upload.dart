@@ -1,6 +1,7 @@
 import 'dart:developer';
 import 'dart:io';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
@@ -20,6 +21,7 @@ class _FileUploadScreenState extends State<FileUploadScreen> {
   }
 
   CollectionReference _firestore = FirebaseFirestore.instance.collection('files');
+  FirebaseAuth mAuth = FirebaseAuth.instance;
 
   double _uploadProgress = 0.0;
   bool _uploading = false;
@@ -84,7 +86,7 @@ class _FileUploadScreenState extends State<FileUploadScreen> {
       print('uploadtask: ${uploadTask.toString()}');
       TaskSnapshot snapshot =
           await uploadTask!.whenComplete(() => print('completed'));
-      uploadedimageurl = await snapshot.ref.getDownloadURL();
+      uploadedimageurl = await reffile.getDownloadURL();
       print('Download Link: $uploadedimageurl');
       setState(() {
         uploadTask = null;
@@ -110,8 +112,11 @@ class _FileUploadScreenState extends State<FileUploadScreen> {
       _uploading = true;
     });
     print('_uploading : $_uploading');
-    _message = await saveData(file: (result?.files.single.path)!, name: filename, type: type);
 
+    if(mAuth.currentUser == null)
+      mAuth.signInAnonymously();
+    print('currentuser: ${mAuth.currentUser}');
+    _message = await saveData(file: (result?.files.single.path)!, name: filename, type: type);
     setState(() {
       _uploading = false;
     });
