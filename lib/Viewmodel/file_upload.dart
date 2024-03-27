@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:typed_data';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_storage/firebase_storage.dart';
@@ -51,14 +52,6 @@ class _FileUploadScreenState extends State<FileUploadScreen> {
         print('resultant file is null');
       }
     }
-    if(File(path!).existsSync())
-      print('file exist');
-    else
-      {
-        File(path!).create();
-        File(path!).writeAsStringSync(path!);
-        print('file created');
-      }
     filename = p.basenameWithoutExtension(path!);
     type = p.extension(path!);
     if ((File(path!).lengthSync()) > 10 * 1024 * 1024) {
